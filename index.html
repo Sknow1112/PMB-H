@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <title>Persistent Memory Bot</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+   <style>
+       body {
+           font-family: Arial, sans-serif;
+           margin: 0;
+           padding: 20px;
+           background: linear-gradient(to bottom right, #222222, #333333);
+           height: calc(100vh - 40px);
+           display: flex;
+           flex-direction: column;
+       }
+
+       h1 {
+           text-align: center;
+           margin-bottom: 20px;
+           color: #f0f8ff;
+           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+       }
+
+       #chat-container {
+           border: 1px solid #ccc;
+           border-radius: 5px;
+           padding: 10px;
+           margin-bottom: 20px;
+           flex: 1;
+           overflow-y: scroll;
+           background-color: #1e1e1e;
+           color: #f0f8ff;
+           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+       }
+
+       .message {
+           margin: 5px 0;
+           padding: 8px;
+           border-radius: 5px;
+           max-width: 80%;
+           white-space: pre-wrap;
+       }
+
+       .user-message {
+           background-color: #59788E;
+           color: white;
+           align-self: flex-end;
+           margin-left: auto;
+           margin-right: 10px;
+       }
+
+       .bot-message {
+           background-color: #2c3e4c;
+           color: white;
+           align-self: flex-start;
+           margin-right: auto;
+       }
+
+       #chat-form {
+           display: flex;
+           margin-top: auto;
+           margin-bottom: 20px;
+       }
+
+       #user-input {
+           flex-grow: 1;
+           padding: 10px;
+           font-size: 16px;
+           border: none;
+           border-radius: 5px;
+       }
+
+       button {
+           padding: 10px;
+           font-size: 16px;
+           background-color: #59788E;
+           color: white;
+           border: none;
+           border-radius: 5px;
+           cursor: pointer;
+           margin-left: 10px;
+       }
+
+       button:hover {
+           background-color: #45a049;
+       }
+
+       .icon {
+           margin-right: 5px;
+       }
+
+       #loading-message {
+           margin-top: 10px;
+           color: #00ff00;
+           font-style: italic;
+       }
+
+       .switch {
+           position: relative;
+           display: inline-block;
+           width: 60px;
+           height: 34px;
+           margin-bottom: 10px;
+       }
+
+       .switch input {
+           opacity: 0;
+           width: 0;
+           height: 0;
+       }
+
+       .slider {
+           position: absolute;
+           cursor: pointer;
+           top: 0;
+           left: 0;
+           right: 0;
+           bottom: 0;
+           background-color: #ccc;
+           transition: .4s;
+           border-radius: 34px;
+       }
+
+       .slider:before {
+           position: absolute;
+           content: "";
+           height: 26px;
+           width: 26px;
+           left: 4px;
+           bottom: 4px;
+           background-color: white;
+           transition: .4s;
+           border-radius: 50%;
+       }
+
+       input:checked + .slider {
+           background-color: #59788E;
+       }
+
+       input:checked + .slider:before {
+           transform: translateX(26px);
+       }
+
+       .mode-label {
+           margin-left: 10px;
+           color: #f0f8ff;
+       }
+   </style>
+   <script>
+       $(document).ready(function() {
+           var memoryMode = 'full';
+
+           $('#memory-toggle').change(function() {
+               memoryMode = $(this).is(':checked') ? 'smart' : 'full';
+           });
+
+           $('#chat-form').submit(function(event) {
+               event.preventDefault();
+               var userInput = $('#user-input').val();
+               $('#chat-container').append('<div class="message user-message"><i class="fas fa-user icon"></i>' + userInput + '</div>');
+               $('#user-input').val('');
+               $('#send-button').prop('disabled', true);
+               $('#loading-message').show();
+               var $botMessage = $('<div class="message bot-message"><i class="fas fa-robot icon"></i></div>');
+               $('#chat-container').append($botMessage);
+               var botResponse = '';
+               $.ajax({
+                   url: '/chat',
+                   method: 'POST',
+                   data: JSON.stringify({ user_input: userInput, mode: memoryMode }),
+                   contentType: 'application/json',
+                   dataType: 'text',  // Add this line to handle the response as text
+                   xhrFields: {
+                       onprogress: function(e) {
+                           var chunk = e.currentTarget.response.slice(botResponse.length);
+                           botResponse += chunk;
+                           $botMessage.html('<i class="fas fa-robot icon"></i>' + botResponse.replace(/\n/g, '<br>'));
+                           $('#chat-container').scrollTop($('#chat-container')[0].scrollHeight);
+                       }
+                   },
+                   success: function() {
+                       $('#send-button').prop('disabled', false);
+                       $('#loading-message').hide();
+                   },
+                   error: function(xhr, status, error) {
+                       $('#send-button').prop('disabled', false);
+                       $('#loading-message').hide();
+                       var errorMessage = '<div class="message error-message"><i class="fas fa-exclamation-triangle icon"></i>Error: ' + error + '</div>';
+                       $('#chat-container').append(errorMessage);
+                   }
+               });
+           });
+
+           setInterval(function() {
+               $.post('/sleep');
+           }, 20000); // set to 50 seconds, usually 2 minutes in milliseconds
+       });
+   </script>
+</head>
+<body>
+   <h1>Persistent Memory Bot</h1>
+   <div id="chat-container"></div>
+   <form id="chat-form">
+       <label class="switch">
+           <input type="checkbox" id="memory-toggle">
+           <span class="slider"></span>
+       </label>
+       <input type="text" id="user-input" name="user_input" placeholder="Enter your message, use the switch to toggle smart mode for faster responses but less memory. Cannot provide financial/legal advice.">
+       <button type="submit" id="send-button"><i class="fas fa-paper-plane"></i> Send</button>
+   </form>
+   <div id="loading-message" style="display: none;">Prompt received. Generating response...</div>
+</body>
+</html>
